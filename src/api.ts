@@ -132,6 +132,7 @@ export async function sendChatMessageStreaming(
         const trimmed = line.trim();
         if (!trimmed) continue;
 
+        // Handle SSE-style "data:" prefix
         if (trimmed.startsWith("data:")) {
           const dataStr = trimmed.slice(5).trim();
           if (dataStr === "[DONE]") {
@@ -154,8 +155,45 @@ export async function sendChatMessageStreaming(
             onChunk(fullText, false);
           }
         } else {
-          fullText += trimmed;
-          onChunk(fullText, false);
+          // Try parsing as JSON line (n8n-style streaming)
+          try {
+            const parsed = JSON.parse(trimmed) as Record<string, unknown>;
+            const lineType = parsed.type as string | undefined;
+
+            // n8n-style: {"type":"item","content":"..."} for text chunks
+            if (lineType === "item") {
+              const text =
+                (parsed.content as string) ??
+                (parsed[responseField] as string) ??
+                (parsed.text as string) ??
+                "";
+              if (text) {
+                fullText += text;
+                onChunk(fullText, false);
+              }
+            }
+            // n8n-style: {"type":"end"} signals completion
+            else if (lineType === "end") {
+              onChunk(fullText, true);
+              return;
+            }
+            // For other JSON lines without recognized type, try extracting text
+            else {
+              const text =
+                (parsed[responseField] as string) ??
+                (parsed.text as string) ??
+                (parsed.content as string) ??
+                "";
+              if (text) {
+                fullText += text;
+                onChunk(fullText, false);
+              }
+            }
+          } catch {
+            // Not JSON - treat as plain text chunk
+            fullText += trimmed;
+            onChunk(fullText, false);
+          }
         }
       }
     }
@@ -178,7 +216,28 @@ export async function sendChatMessageStreaming(
           }
         }
       } else {
-        fullText += trimmed;
+        // Try parsing as JSON line (n8n-style streaming)
+        try {
+          const parsed = JSON.parse(trimmed) as Record<string, unknown>;
+          const lineType = parsed.type as string | undefined;
+          if (lineType === "item") {
+            const text =
+              (parsed.content as string) ??
+              (parsed[responseField] as string) ??
+              (parsed.text as string) ??
+              "";
+            if (text) fullText += text;
+          } else if (lineType !== "end") {
+            const text =
+              (parsed[responseField] as string) ??
+              (parsed.text as string) ??
+              (parsed.content as string) ??
+              "";
+            if (text) fullText += text;
+          }
+        } catch {
+          fullText += trimmed;
+        }
       }
     }
 
