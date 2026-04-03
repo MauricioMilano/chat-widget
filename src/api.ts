@@ -31,6 +31,7 @@ function normalizeBaseUrl(baseUrl: string): string {
 function processLine(
   line: string,
   responseField: string,
+  hasContent: boolean,
 ): { text: string | null; done: boolean } {
   const trimmed = line.trim();
   if (!trimmed) {
@@ -59,8 +60,17 @@ function processLine(
     const parsed = JSON.parse(trimmed) as Record<string, unknown>;
     const lineType = parsed.type as string | undefined;
 
+    if (lineType === "begin") {
+      return { text: null, done: false };
+    }
+
     if (lineType === "end") {
-      return { text: null, done: true };
+      return { text: null, done: hasContent };
+    }
+
+    if (lineType === "item") {
+      const text = (parsed.content as string) ?? "";
+      return { text: text || null, done: false };
     }
 
     const text =
@@ -177,7 +187,7 @@ export async function sendChatMessageStreaming(
       buffer = lines.pop() ?? "";
 
       for (const line of lines) {
-        const result = processLine(line, responseField);
+        const result = processLine(line, responseField, fullText.length > 0);
         if (result.done) {
           onChunk(fullText, true);
           return;
@@ -189,7 +199,7 @@ export async function sendChatMessageStreaming(
       }
     }
 
-    const trailing = processLine(buffer, responseField);
+    const trailing = processLine(buffer, responseField, fullText.length > 0);
     if (trailing.text) {
       fullText += trailing.text;
     }
