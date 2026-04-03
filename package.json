@@ -1,0 +1,22 @@
+{
+  "name": "chat-widget",
+  "version": "1.0.0",
+  "description": "A production-ready, embeddable chat widget with streaming support",
+  "main": "dist/chat-widget.js",
+  "scripts": {
+    "build": "node build.js",
+    "dev": "node build.js --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "esbuild": "^0.20.0",
+    "typescript": "^5.4.0"
+  },
+  "keywords": [
+    "chat",
+    "widget",
+    "embeddable",
+    "streaming"
+  ],
+  "license": "MIT"
+}
