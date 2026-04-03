@@ -7,6 +7,7 @@ export interface ChatConfig {
   messageFieldName?: string;
   sessionIdFieldName?: string;
   responseField?: string;
+  normalEndpointPath?: string;
   streamingEndpointPath?: string;
 }
 
@@ -27,6 +28,52 @@ function normalizeBaseUrl(baseUrl: string): string {
   return baseUrl.replace(/\/+$/, "");
 }
 
+function processLine(
+  line: string,
+  responseField: string,
+): { text: string | null; done: boolean } {
+  const trimmed = line.trim();
+  if (!trimmed) {
+    return { text: null, done: false };
+  }
+
+  if (trimmed.startsWith("data:")) {
+    const dataStr = trimmed.slice(5).trim();
+    if (dataStr === "[DONE]") {
+      return { text: null, done: true };
+    }
+    try {
+      const parsed = JSON.parse(dataStr) as Record<string, unknown>;
+      const text =
+        (parsed[responseField] as string) ??
+        (parsed.text as string) ??
+        (parsed.content as string) ??
+        "";
+      return { text: text || null, done: false };
+    } catch {
+      return { text: dataStr, done: false };
+    }
+  }
+
+  try {
+    const parsed = JSON.parse(trimmed) as Record<string, unknown>;
+    const lineType = parsed.type as string | undefined;
+
+    if (lineType === "end") {
+      return { text: null, done: true };
+    }
+
+    const text =
+      (parsed.content as string) ??
+      (parsed[responseField] as string) ??
+      (parsed.text as string) ??
+      "";
+    return { text: text || null, done: false };
+  } catch {
+    return { text: trimmed, done: false };
+  }
+}
+
 export async function sendChatMessage(
   config: ChatConfig,
   message: string,
@@ -37,8 +84,9 @@ export async function sendChatMessage(
   const messageField = config.messageFieldName ?? "chatInput";
   const sessionField = config.sessionIdFieldName ?? "sessionId";
   const responseField = config.responseField ?? "output";
+  const normalPath = config.normalEndpointPath ?? "/webhook/chat";
 
-  const url = `${baseUrl}/webhook/chat`;
+  const url = `${baseUrl}${normalPath}`;
 
   const timeoutController = new AbortController();
   const timeoutId = setTimeout(() => timeoutController.abort(), timeoutMs);
@@ -129,116 +177,21 @@ export async function sendChatMessageStreaming(
       buffer = lines.pop() ?? "";
 
       for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed) continue;
-
-        // Handle SSE-style "data:" prefix
-        if (trimmed.startsWith("data:")) {
-          const dataStr = trimmed.slice(5).trim();
-          if (dataStr === "[DONE]") {
-            onChunk(fullText, true);
-            return;
-          }
-          try {
-            const parsed = JSON.parse(dataStr) as Record<string, unknown>;
-            const text =
-              (parsed[responseField] as string) ??
-              (parsed.text as string) ??
-              (parsed.content as string) ??
-              "";
-            if (text) {
-              fullText += text;
-              onChunk(fullText, false);
-            }
-          } catch {
-            fullText += dataStr;
-            onChunk(fullText, false);
-          }
-        } else {
-          // Try parsing as JSON line (n8n-style streaming)
-          try {
-            const parsed = JSON.parse(trimmed) as Record<string, unknown>;
-            const lineType = parsed.type as string | undefined;
-
-            // n8n-style: {"type":"item","content":"..."} for text chunks
-            if (lineType === "item") {
-              const text =
-                (parsed.content as string) ??
-                (parsed[responseField] as string) ??
-                (parsed.text as string) ??
-                "";
-              if (text) {
-                fullText += text;
-                onChunk(fullText, false);
-              }
-            }
-            // n8n-style: {"type":"end"} signals completion
-            else if (lineType === "end") {
-              onChunk(fullText, true);
-              return;
-            }
-            // For other JSON lines without recognized type, try extracting text
-            else {
-              const text =
-                (parsed[responseField] as string) ??
-                (parsed.text as string) ??
-                (parsed.content as string) ??
-                "";
-              if (text) {
-                fullText += text;
-                onChunk(fullText, false);
-              }
-            }
-          } catch {
-            // Not JSON - treat as plain text chunk
-            fullText += trimmed;
-            onChunk(fullText, false);
-          }
+        const result = processLine(line, responseField);
+        if (result.done) {
+          onChunk(fullText, true);
+          return;
+        }
+        if (result.text) {
+          fullText += result.text;
+          onChunk(fullText, false);
         }
       }
     }
 
-    if (buffer.trim()) {
-      const trimmed = buffer.trim();
-      if (trimmed.startsWith("data:")) {
-        const dataStr = trimmed.slice(5).trim();
-        if (dataStr !== "[DONE]") {
-          try {
-            const parsed = JSON.parse(dataStr) as Record<string, unknown>;
-            const text =
-              (parsed[responseField] as string) ??
-              (parsed.text as string) ??
-              (parsed.content as string) ??
-              "";
-            if (text) fullText += text;
-          } catch {
-            fullText += dataStr;
-          }
-        }
-      } else {
-        // Try parsing as JSON line (n8n-style streaming)
-        try {
-          const parsed = JSON.parse(trimmed) as Record<string, unknown>;
-          const lineType = parsed.type as string | undefined;
-          if (lineType === "item") {
-            const text =
-              (parsed.content as string) ??
-              (parsed[responseField] as string) ??
-              (parsed.text as string) ??
-              "";
-            if (text) fullText += text;
-          } else if (lineType !== "end") {
-            const text =
-              (parsed[responseField] as string) ??
-              (parsed.text as string) ??
-              (parsed.content as string) ??
-              "";
-            if (text) fullText += text;
-          }
-        } catch {
-          fullText += trimmed;
-        }
-      }
+    const trailing = processLine(buffer, responseField);
+    if (trailing.text) {
+      fullText += trailing.text;
     }
 
     onChunk(fullText, true);

@@ -1,7 +1,7 @@
 FROM node:20-alpine AS builder
 WORKDIR /app
-COPY package.json package-lock.json* pnpm-lock.yaml* ./
-RUN npm install --ignore-scripts 2>/dev/null || true
+COPY package.json package-lock.json ./
+RUN npm install --ignore-scripts
 COPY tsconfig.json build.js ./
 COPY src/ src/
 COPY test/ test/

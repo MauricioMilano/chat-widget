@@ -20,7 +20,7 @@ export interface UICallbacks {
 
 export class ChatUI {
   private shadow: ShadowRoot;
-  private container: HTMLElement;
+
   private panel: HTMLElement | null = null;
   private chatButton: HTMLElement | null = null;
   private messagesContainer: HTMLElement | null = null;
@@ -39,7 +39,7 @@ export class ChatUI {
     config: UIConfig,
     callbacks: UICallbacks,
   ) {
-    this.container = container;
+
     this.config = config;
     this.callbacks = callbacks;
 

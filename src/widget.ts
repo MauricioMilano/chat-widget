@@ -236,7 +236,7 @@ export class ChatWidget {
     saveConversation(this.conversation);
   }
 
-  private async handleStreamingMessage(_message: string): Promise<void> {
+  private async handleStreamingMessage(message: string): Promise<void> {
     if (!this.ui) return;
 
     this.ui.showTyping();
@@ -257,7 +257,7 @@ export class ChatWidget {
         responseField: this.config.responseField,
         streamingEndpointPath: this.config.streamingEndpointPath,
       },
-      _message,
+      message,
       (chunk: string, done: boolean) => {
         fullResponse = chunk;
         this.ui!.hideTyping();

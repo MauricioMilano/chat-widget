@@ -18,7 +18,7 @@ function getConfig(): WidgetConfig | null {
   const scripts = document.querySelectorAll("script[src]");
   for (const script of scripts) {
     const src = script.getAttribute("src") || "";
-    if (src.includes("chat-widget")) {
+    if (/chat-widget(\.min)?\.js/.test(src)) {
       const baseUrl = script.getAttribute("data-base-url");
       if (!baseUrl) continue;
 
@@ -45,16 +45,25 @@ function getConfig(): WidgetConfig | null {
       if (position) config.position = position;
 
       const panelWidth = script.getAttribute("data-panel-width");
-      if (panelWidth) config.panelWidth = parseInt(panelWidth, 10);
+      if (panelWidth) {
+        const parsed = parseInt(panelWidth, 10);
+        if (!isNaN(parsed)) config.panelWidth = parsed;
+      }
 
       const panelHeight = script.getAttribute("data-panel-height");
-      if (panelHeight) config.panelHeight = parseInt(panelHeight, 10);
+      if (panelHeight) {
+        const parsed = parseInt(panelHeight, 10);
+        if (!isNaN(parsed)) config.panelHeight = parsed;
+      }
 
       const accent = script.getAttribute("data-accent-color");
       if (accent) config.accentColor = accent;
 
       const timeout = script.getAttribute("data-timeout");
-      if (timeout) config.apiTimeoutMs = parseInt(timeout, 10);
+      if (timeout) {
+        const parsed = parseInt(timeout, 10);
+        if (!isNaN(parsed)) config.apiTimeoutMs = parsed;
+      }
 
       const normalPath = script.getAttribute("data-normal-endpoint");
       if (normalPath) config.normalEndpointPath = normalPath;
@@ -92,16 +101,16 @@ function getConfig(): WidgetConfig | null {
       if (lightThemeStr) {
         try {
           config.lightTheme = JSON.parse(lightThemeStr) as ThemeColors;
-        } catch {
-          /* ignore */
+        } catch (e) {
+          console.warn("[ChatWidget] Failed to parse data-light-theme:", e);
         }
       }
       const darkThemeStr = script.getAttribute("data-dark-theme");
       if (darkThemeStr) {
         try {
           config.darkTheme = JSON.parse(darkThemeStr) as ThemeColors;
-        } catch {
-          /* ignore */
+        } catch (e) {
+          console.warn("[ChatWidget] Failed to parse data-dark-theme:", e);
         }
       }
 
@@ -113,6 +122,9 @@ function getConfig(): WidgetConfig | null {
 }
 
 function init(): void {
+  if ((window as any).__chatWidgetInitialized) return;
+  (window as any).__chatWidgetInitialized = true;
+
   const config = getConfig();
 
   if (!config) {

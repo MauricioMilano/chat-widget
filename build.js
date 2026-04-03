@@ -22,7 +22,7 @@ function loadEnv() {
   return env;
 }
 
-// Replace placeholders in test/index.html
+// Replace placeholders in test/index.html and write to a separate output file
 function prepareTestPage(env) {
   const htmlPath = path.resolve(__dirname, "test/index.html");
   if (!fs.existsSync(htmlPath)) return;
@@ -33,8 +33,9 @@ function prepareTestPage(env) {
     env.CHAT_WIDGET_BASE_URL || "https://your-n8n-instance.com",
   );
   html = html.replace("__CHAT_WIDGET_AUTH__", env.CHAT_WIDGET_AUTH || "");
-  fs.writeFileSync(htmlPath, html, "utf-8");
-  console.log("Test page prepared with env values.");
+  const outputPath = path.resolve(__dirname, "test/index.dev.html");
+  fs.writeFileSync(outputPath, html, "utf-8");
+  console.log(`Test page prepared with env values -> ${outputPath}`);
 }
 
 const buildConfig = {
