@@ -2,10 +2,12 @@
 
 import { getStyles } from "./styles";
 import type { StoredMessage } from "./storage";
+import type { WidgetConfig } from "./widget";
 
 export interface UIConfig {
   theme: "light" | "dark";
   streamingMode: boolean;
+  config: Required<WidgetConfig>;
 }
 
 export interface UICallbacks {
@@ -47,7 +49,7 @@ export class ChatUI {
 
   private render(): void {
     const styleEl = document.createElement("style");
-    styleEl.textContent = getStyles(this.config.theme);
+    styleEl.textContent = getStyles(this.config.theme, this.config.config);
     this.shadow.appendChild(styleEl);
 
     this.renderStructure();
@@ -55,9 +57,12 @@ export class ChatUI {
   }
 
   private renderStructure(): void {
+    const c = this.config.config;
+    const isLeft = c.position === "bottom-left";
+
     // Main wrapper
     const wrapper = document.createElement("div");
-    wrapper.className = "chat-widget-wrapper";
+    wrapper.className = `chat-widget-wrapper ${isLeft ? "position-left" : ""}`;
 
     // Floating button
     this.chatButton = this.createElement("button", {
@@ -78,8 +83,8 @@ export class ChatUI {
             <svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/></svg>
           </div>
           <div>
-            <div class="chat-header-title">Chat Assistant</div>
-            <div class="chat-header-subtitle">Always here to help</div>
+            <div class="chat-header-title">${this.escapeHtml(c.widgetTitle)}</div>
+            <div class="chat-header-subtitle">${this.escapeHtml(c.widgetSubtitle)}</div>
           </div>
         </div>
         <button class="menu-button" aria-label="Menu">
@@ -87,12 +92,20 @@ export class ChatUI {
         </button>
       </div>
       <div class="menu-dropdown">
+        ${
+          c.showStreamingToggle
+            ? `
         <button class="menu-item streaming-toggle">
           <svg viewBox="0 0 24 24"><path d="M13 2.05v2.02c3.95.49 7 3.85 7 7.93 0 1.62-.49 3.13-1.32 4.39l1.46 1.46C21.32 15.97 22 14.07 22 12c0-5.18-3.95-9.45-9-9.95zM12 19c-3.87 0-7-3.13-7-7 0-3.53 2.61-6.43 6-6.92V3.03c-4.06.5-7.18 3.91-7.18 8.03 0 4.57 3.72 8.28 8.28 8.28 2.4 0 4.56-1.02 6.08-2.65l-1.46-1.46C15.55 16.53 13.86 19 12 19z"/></svg>
           <span class="menu-item-label">Streaming Mode</span>
           <div class="toggle-indicator${this.config.streamingMode ? " active" : ""}"></div>
         </button>
-        <div class="menu-divider"></div>
+        <div class="menu-divider"></div>`
+            : ""
+        }
+        ${
+          c.showThemeToggle
+            ? `
         <div class="theme-toggle-group">
           <svg viewBox="0 0 24 24"><path d="M12 7c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zM2 13h2c.55 0 1-.45 1-1s-.45-1-1-1H2c-.55 0-1 .45-1 1s.45 1 1 1zm18 0h2c.55 0 1-.45 1-1s-.45-1-1-1h-2c-.55 0-1 .45-1 1s.45 1 1 1zM11 2v2c0 .55.45 1 1 1s1-.45 1-1V2c0-.55-.45-1-1-1s-1 .45-1 1zm0 18v2c0 .55.45 1 1 1s1-.45 1-1v-2c0-.55-.45-1-1-1s-1 .45-1 1z"/></svg>
           <button class="theme-btn ${this.config.theme === "light" ? "active" : ""}" data-theme="light">
@@ -104,12 +117,19 @@ export class ChatUI {
             Dark
           </button>
         </div>
-        <div class="menu-divider"></div>
+        <div class="menu-divider"></div>`
+            : ""
+        }
+        ${
+          c.showClearButton
+            ? `
         <button class="menu-item clear-chat">
           <svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
           <span class="menu-item-label">Clear Conversation</span>
         </button>
-        <div class="menu-divider"></div>
+        <div class="menu-divider"></div>`
+            : ""
+        }
         <button class="menu-item danger close-chat">
           <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
           <span class="menu-item-label">Close Chat</span>
@@ -118,7 +138,7 @@ export class ChatUI {
       <div class="messages-container">
         <div class="welcome-message">
           <svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/></svg>
-          <p>👋 Hello! How can I help you today?</p>
+          <p>${this.escapeHtml(c.welcomeMessage)}</p>
         </div>
       </div>
       <div class="typing-indicator" style="display: none;">
@@ -128,7 +148,7 @@ export class ChatUI {
       </div>
       <div class="input-area">
         <div class="input-wrapper">
-          <textarea class="chat-input" placeholder="Type a message..." rows="1"></textarea>
+          <textarea class="chat-input" placeholder="${this.escapeHtml(c.inputPlaceholder)}" rows="1"></textarea>
         </div>
         <button class="send-button" aria-label="Send">
           <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
@@ -146,6 +166,14 @@ export class ChatUI {
     this.menuDropdown = this.panel.querySelector(".menu-dropdown");
     this.menuButton = this.panel.querySelector(".menu-button");
     this.typingIndicator = this.panel.querySelector(".typing-indicator");
+  }
+
+  private escapeHtml(text: string): string {
+    return text
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
   }
 
   private createElement(
@@ -389,10 +417,11 @@ export class ChatUI {
 
   public clearMessages(): void {
     if (!this.messagesContainer) return;
+    const msg = this.escapeHtml(this.config.config.welcomeMessage);
     this.messagesContainer.innerHTML = `
       <div class="welcome-message">
         <svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/></svg>
-        <p>👋 Hello! How can I help you today?</p>
+        <p>${msg}</p>
       </div>
     `;
   }
@@ -412,7 +441,7 @@ export class ChatUI {
   public updateStyles(theme: "light" | "dark"): void {
     const styleEl = this.shadow.querySelector("style");
     if (styleEl) {
-      styleEl.textContent = getStyles(theme);
+      styleEl.textContent = getStyles(theme, this.config.config);
     }
   }
 

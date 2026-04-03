@@ -43,7 +43,8 @@ function safeRemoveItem(key: string): void {
   }
 }
 
-export function getSessionId(): string {
+export function getSessionId(overrideId?: string): string {
+  if (overrideId) return overrideId;
   let sessionId = safeGetItem(getKey("sessionId"));
   if (!sessionId) {
     sessionId = generateId();

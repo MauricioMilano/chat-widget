@@ -1,59 +1,196 @@
 // CSS styles as template literal - scoped to shadow DOM
 
-export function getStyles(theme: "light" | "dark"): string {
-  const colors =
-    theme === "dark"
-      ? {
-          bgPrimary: "#1a1a2e",
-          bgSecondary: "#16213e",
-          bgTertiary: "#0f3460",
-          bgInput: "#1a1a2e",
-          bgMessages: "#12122a",
-          textPrimary: "#eaeaea",
-          textSecondary: "#a0a0b0",
-          textMuted: "#6c6c7e",
-          userBubble: "#533483",
-          aiBubble: "#2a2a3e",
-          border: "#2a2a3e",
-          shadow: "rgba(0,0,0,0.5)",
-          accent: "#7c3aed",
-          accentHover: "#6d28d9",
-          danger: "#e94560",
-          dangerHover: "#ff6b81",
-          typingDot: "#a0a0b0",
-          menuBg: "#16213e",
-          menuHover: "#1a1a2e",
-          scrollThumb: "#3a3a4e",
-          scrollTrack: "#1a1a2e",
-          panelBg:
-            "linear-gradient(180deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)",
-          headerBg: "linear-gradient(135deg, #533483 0%, #0f3460 100%)",
-        }
-      : {
-          bgPrimary: "#ffffff",
-          bgSecondary: "#f8f9fa",
-          bgTertiary: "#e9ecef",
-          bgInput: "#ffffff",
-          bgMessages: "#f0f2f5",
-          textPrimary: "#1a1a2e",
-          textSecondary: "#495057",
-          textMuted: "#868e96",
-          userBubble: "#4361ee",
-          aiBubble: "#ffffff",
-          border: "#e5e7eb",
-          shadow: "rgba(0,0,0,0.18)",
-          accent: "#4361ee",
-          accentHover: "#3a56d4",
-          danger: "#e03131",
-          dangerHover: "#f03e3e",
-          typingDot: "#868e96",
-          menuBg: "#ffffff",
-          menuHover: "#f1f3f5",
-          scrollThumb: "#ced4da",
-          scrollTrack: "#f1f3f5",
-          panelBg: "linear-gradient(180deg, #ffffff 0%, #f0f2f5 100%)",
-          headerBg: "linear-gradient(135deg, #4361ee 0%, #7c3aed 100%)",
-        };
+import type { WidgetConfig, ThemeColors } from "./widget";
+
+interface ResolvedColors {
+  bgPrimary: string;
+  bgSecondary: string;
+  bgTertiary: string;
+  bgInput: string;
+  bgMessages: string;
+  textPrimary: string;
+  textSecondary: string;
+  textMuted: string;
+  userBubble: string;
+  aiBubble: string;
+  border: string;
+  shadow: string;
+  accent: string;
+  accentHover: string;
+  danger: string;
+  dangerHover: string;
+  typingDot: string;
+  menuBg: string;
+  menuHover: string;
+  scrollThumb: string;
+  scrollTrack: string;
+  panelBg: string;
+  headerBg: string;
+}
+
+const DEFAULT_LIGHT: ResolvedColors = {
+  bgPrimary: "#ffffff",
+  bgSecondary: "#f8f9fa",
+  bgTertiary: "#e9ecef",
+  bgInput: "#ffffff",
+  bgMessages: "#f0f2f5",
+  textPrimary: "#1a1a2e",
+  textSecondary: "#495057",
+  textMuted: "#868e96",
+  userBubble: "#4361ee",
+  aiBubble: "#ffffff",
+  border: "#e5e7eb",
+  shadow: "rgba(0,0,0,0.18)",
+  accent: "#4361ee",
+  accentHover: "#3a56d4",
+  danger: "#e03131",
+  dangerHover: "#f03e3e",
+  typingDot: "#868e96",
+  menuBg: "#ffffff",
+  menuHover: "#f1f3f5",
+  scrollThumb: "#ced4da",
+  scrollTrack: "#f1f3f5",
+  panelBg: "linear-gradient(180deg, #ffffff 0%, #f0f2f5 100%)",
+  headerBg: "linear-gradient(135deg, #4361ee 0%, #3a56d4 100%)",
+};
+
+const DEFAULT_DARK: ResolvedColors = {
+  bgPrimary: "#1a1a2e",
+  bgSecondary: "#16213e",
+  bgTertiary: "#0f3460",
+  bgInput: "#1a1a2e",
+  bgMessages: "#12122a",
+  textPrimary: "#eaeaea",
+  textSecondary: "#a0a0b0",
+  textMuted: "#6c6c7e",
+  userBubble: "#7c3aed",
+  aiBubble: "#2a2a3e",
+  border: "#2a2a3e",
+  shadow: "rgba(0,0,0,0.5)",
+  accent: "#7c3aed",
+  accentHover: "#6d28d9",
+  danger: "#e94560",
+  dangerHover: "#ff6b81",
+  typingDot: "#a0a0b0",
+  menuBg: "#16213e",
+  menuHover: "#1a1a2e",
+  scrollThumb: "#3a3a4e",
+  scrollTrack: "#1a1a2e",
+  panelBg: "linear-gradient(180deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)",
+  headerBg: "linear-gradient(135deg, #7c3aed 0%, #0f3460 100%)",
+};
+
+function mergeColors(
+  defaults: ResolvedColors,
+  override?: ThemeColors,
+): ResolvedColors {
+  if (!override) return { ...defaults };
+  const merged = { ...defaults };
+  for (const key of Object.keys(defaults) as (keyof ResolvedColors)[]) {
+    if (override[key] !== undefined) {
+      (merged as Record<string, string>)[key] = override[key] as string;
+    }
+  }
+  return merged;
+}
+
+function getColors(
+  theme: "light" | "dark",
+  accentOverride?: string,
+): ResolvedColors {
+  const isDark = theme === "dark";
+  const accent = accentOverride || (isDark ? "#7c3aed" : "#4361ee");
+
+  // Generate hover color (slightly darker/lighter)
+  const accentHover = isDark ? shadeColor(accent, 15) : shadeColor(accent, -10);
+
+  if (isDark) {
+    return {
+      bgPrimary: "#1a1a2e",
+      bgSecondary: "#16213e",
+      bgTertiary: "#0f3460",
+      bgInput: "#1a1a2e",
+      bgMessages: "#12122a",
+      textPrimary: "#eaeaea",
+      textSecondary: "#a0a0b0",
+      textMuted: "#6c6c7e",
+      userBubble: accent,
+      aiBubble: "#2a2a3e",
+      border: "#2a2a3e",
+      shadow: "rgba(0,0,0,0.5)",
+      accent,
+      accentHover,
+      danger: "#e94560",
+      dangerHover: "#ff6b81",
+      typingDot: "#a0a0b0",
+      menuBg: "#16213e",
+      menuHover: "#1a1a2e",
+      scrollThumb: "#3a3a4e",
+      scrollTrack: "#1a1a2e",
+      panelBg: "linear-gradient(180deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)",
+      headerBg: `linear-gradient(135deg, ${accent} 0%, #0f3460 100%)`,
+    };
+  }
+
+  return {
+    bgPrimary: "#ffffff",
+    bgSecondary: "#f8f9fa",
+    bgTertiary: "#e9ecef",
+    bgInput: "#ffffff",
+    bgMessages: "#f0f2f5",
+    textPrimary: "#1a1a2e",
+    textSecondary: "#495057",
+    textMuted: "#868e96",
+    userBubble: accent,
+    aiBubble: "#ffffff",
+    border: "#e5e7eb",
+    shadow: "rgba(0,0,0,0.18)",
+    accent,
+    accentHover,
+    danger: "#e03131",
+    dangerHover: "#f03e3e",
+    typingDot: "#868e96",
+    menuBg: "#ffffff",
+    menuHover: "#f1f3f5",
+    scrollThumb: "#ced4da",
+    scrollTrack: "#f1f3f5",
+    panelBg: "linear-gradient(180deg, #ffffff 0%, #f0f2f5 100%)",
+    headerBg: `linear-gradient(135deg, ${accent} 0%, ${shadeColor(accent, -20)} 100%)`,
+  };
+}
+
+function shadeColor(hex: string, percent: number): string {
+  const num = parseInt(hex.replace("#", ""), 16);
+  const r = Math.min(255, Math.max(0, (num >> 16) + percent));
+  const g = Math.min(255, Math.max(0, ((num >> 8) & 0x00ff) + percent));
+  const b = Math.min(255, Math.max(0, (num & 0x0000ff) + percent));
+  return `#${(0x1000000 + r * 0x10000 + g * 0x100 + b).toString(16).slice(1)}`;
+}
+
+export function getStyles(
+  theme: "light" | "dark",
+  config: Required<WidgetConfig>,
+): string {
+  // Legacy accentColor support: if set, merge into theme colors
+  const legacyOverride: ThemeColors | undefined = config.accentColor
+    ? { accent: config.accentColor }
+    : undefined;
+
+  const baseDefaults = theme === "dark" ? DEFAULT_DARK : DEFAULT_LIGHT;
+  const themeOverride = theme === "dark" ? config.darkTheme : config.lightTheme;
+
+  // Merge: defaults <- legacy accent <- full theme override
+  const colors = mergeColors(
+    mergeColors(baseDefaults, legacyOverride),
+    themeOverride,
+  );
+  const isLeft = config.position === "bottom-left";
+  const panelW = config.panelWidth;
+  const panelH = config.panelHeight;
+
+  const posSide = isLeft ? "left" : "right";
+  const posOpposite = isLeft ? "right" : "left";
+  const transformOrigin = isLeft ? "bottom left" : "bottom right";
 
   return `
     :host {
@@ -74,7 +211,7 @@ export function getStyles(theme: "light" | "dark"): string {
     .chat-button {
       position: fixed;
       bottom: 24px;
-      right: 24px;
+      ${posSide}: 24px;
       width: 60px;
       height: 60px;
       border-radius: 50%;
@@ -123,10 +260,10 @@ export function getStyles(theme: "light" | "dark"): string {
     .chat-panel {
       position: fixed;
       bottom: 100px;
-      right: 24px;
-      width: 380px;
+      ${posSide}: 24px;
+      width: ${panelW}px;
       max-width: calc(100vw - 48px);
-      height: 560px;
+      height: ${panelH}px;
       max-height: calc(100vh - 120px);
       background: ${colors.panelBg};
       border-radius: 20px;
@@ -137,7 +274,7 @@ export function getStyles(theme: "light" | "dark"): string {
       z-index: 2147483647;
       opacity: 0;
       transform: translateY(20px) scale(0.95);
-      transform-origin: bottom right;
+      transform-origin: ${transformOrigin};
       pointer-events: none;
       transition: opacity 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), 
                   transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -234,7 +371,7 @@ export function getStyles(theme: "light" | "dark"): string {
     .menu-dropdown {
       position: absolute;
       top: 60px;
-      right: 12px;
+      ${posSide}: 12px;
       background: ${colors.menuBg};
       border: 1px solid ${colors.border};
       border-radius: 12px;
@@ -440,13 +577,13 @@ export function getStyles(theme: "light" | "dark"): string {
     .message.user .message-bubble {
       background: ${colors.userBubble};
       color: white;
-      border-bottom-right-radius: 4px;
+      border-bottom-${posSide}-radius: 4px;
     }
 
     .message.assistant .message-bubble {
       background: ${colors.aiBubble};
       color: ${colors.textPrimary};
-      border-bottom-left-radius: 4px;
+      border-bottom-${posOpposite}-radius: 4px;
     }
 
     .message-time {
@@ -578,7 +715,7 @@ export function getStyles(theme: "light" | "dark"): string {
 
     .chat-input:focus {
       border-color: ${colors.accent};
-      box-shadow: 0 0 0 3px ${theme === "dark" ? "rgba(83, 52, 131, 0.3)" : "rgba(67, 97, 238, 0.15)"};
+      box-shadow: 0 0 0 3px ${theme === "dark" ? "rgba(124, 58, 237, 0.3)" : "rgba(67, 97, 238, 0.15)"};
     }
 
     .chat-input::placeholder {
@@ -651,13 +788,13 @@ export function getStyles(theme: "light" | "dark"): string {
         height: calc(100vh - 80px);
         max-height: calc(100vh - 80px);
         bottom: 80px;
-        right: 8px;
+        ${posSide}: 8px;
         border-radius: 12px;
       }
 
       .chat-button {
         bottom: 16px;
-        right: 16px;
+        ${posSide}: 16px;
         width: 56px;
         height: 56px;
       }

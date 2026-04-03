@@ -14,13 +14,97 @@ import {
   type WidgetSettings,
 } from "./storage";
 
-export interface WidgetConfig {
-  baseUrl: string;
-  auth?: string;
+export interface ThemeColors {
+  bgPrimary?: string;
+  bgSecondary?: string;
+  bgTertiary?: string;
+  bgInput?: string;
+  bgMessages?: string;
+  textPrimary?: string;
+  textSecondary?: string;
+  textMuted?: string;
+  userBubble?: string;
+  aiBubble?: string;
+  border?: string;
+  shadow?: string;
+  accent?: string;
+  accentHover?: string;
+  danger?: string;
+  dangerHover?: string;
+  typingDot?: string;
+  menuBg?: string;
+  menuHover?: string;
+  scrollThumb?: string;
+  scrollTrack?: string;
+  panelBg?: string;
+  headerBg?: string;
 }
 
+export interface WidgetConfig {
+  // Required
+  baseUrl: string;
+
+  // Auth
+  auth?: string;
+
+  // Text
+  widgetTitle?: string;
+  widgetSubtitle?: string;
+  inputPlaceholder?: string;
+  welcomeMessage?: string;
+
+  // Position & Dimensions
+  position?: "bottom-right" | "bottom-left";
+  panelWidth?: number;
+  panelHeight?: number;
+
+  // Colors (legacy single accent override)
+  accentColor?: string;
+
+  // Full theme customization
+  lightTheme?: ThemeColors;
+  darkTheme?: ThemeColors;
+
+  // API
+  apiTimeoutMs?: number;
+  normalEndpointPath?: string;
+  streamingEndpointPath?: string;
+  messageFieldName?: string;
+  sessionIdFieldName?: string;
+  responseField?: string;
+
+  // Behavior
+  autoOpen?: boolean;
+  sessionId?: string;
+
+  // Feature Toggles
+  showStreamingToggle?: boolean;
+  showThemeToggle?: boolean;
+  showClearButton?: boolean;
+}
+
+const DEFAULTS = {
+  widgetTitle: "Chat Assistant",
+  widgetSubtitle: "Always here to help",
+  inputPlaceholder: "Type a message...",
+  welcomeMessage: "Hello! How can I help you today?",
+  position: "bottom-right" as const,
+  panelWidth: 380,
+  panelHeight: 560,
+  apiTimeoutMs: 30000,
+  normalEndpointPath: "/webhook/chat",
+  streamingEndpointPath: "/webhook/chat-streaming",
+  messageFieldName: "chatInput",
+  sessionIdFieldName: "sessionId",
+  responseField: "output",
+  autoOpen: false,
+  showStreamingToggle: true,
+  showThemeToggle: true,
+  showClearButton: true,
+};
+
 export class ChatWidget {
-  private config: WidgetConfig;
+  private config: Required<WidgetConfig>;
   private sessionId: string;
   private settings: WidgetSettings;
   private conversation: StoredMessage[];
@@ -29,25 +113,25 @@ export class ChatWidget {
   private isProcessing = false;
   private abortController: AbortController | null = null;
 
-  constructor(config: WidgetConfig) {
-    this.config = config;
-    this.sessionId = getSessionId();
+  constructor(userConfig: WidgetConfig) {
+    this.config = { ...DEFAULTS, ...userConfig } as Required<WidgetConfig>;
+    this.sessionId =
+      this.config.sessionId || getSessionId(this.config.sessionId);
     this.settings = getSettings();
     this.conversation = getConversation();
   }
 
   public init(): void {
-    // Create shadow DOM host element
     this.shadowHost = document.createElement("div");
     this.shadowHost.id = "chat-widget-host";
     document.body.appendChild(this.shadowHost);
 
-    // Initialize UI with shadow host - ChatUI will attach shadow DOM
     this.ui = new ChatUI(
       this.shadowHost,
       {
         theme: this.settings.theme,
         streamingMode: this.settings.streamingMode,
+        config: this.config,
       },
       {
         onSendMessage: (message: string) => this.handleSendMessage(message),
@@ -59,9 +143,12 @@ export class ChatWidget {
       },
     );
 
-    // Restore previous messages
     if (this.conversation.length > 0) {
       this.ui.restoreMessages(this.conversation);
+    }
+
+    if (this.config.autoOpen) {
+      this.open();
     }
   }
 
@@ -89,7 +176,6 @@ export class ChatWidget {
     this.abortController = new AbortController();
     const timestamp = Date.now();
 
-    // Add user message to UI and conversation
     this.ui.addUserMessage(message, timestamp);
     this.conversation.push({
       id: generateMessageId(),
@@ -128,9 +214,13 @@ export class ChatWidget {
         baseUrl: this.config.baseUrl,
         auth: this.config.auth,
         sessionId: this.sessionId,
+        messageFieldName: this.config.messageFieldName,
+        sessionIdFieldName: this.config.sessionIdFieldName,
+        responseField: this.config.responseField,
       },
       message,
       this.abortController?.signal,
+      this.config.apiTimeoutMs,
     );
 
     this.ui.hideTyping();
@@ -162,6 +252,10 @@ export class ChatWidget {
         baseUrl: this.config.baseUrl,
         auth: this.config.auth,
         sessionId: this.sessionId,
+        messageFieldName: this.config.messageFieldName,
+        sessionIdFieldName: this.config.sessionIdFieldName,
+        responseField: this.config.responseField,
+        streamingEndpointPath: this.config.streamingEndpointPath,
       },
       _message,
       (chunk: string, done: boolean) => {
@@ -181,6 +275,7 @@ export class ChatWidget {
         }
       },
       this.abortController?.signal,
+      this.config.apiTimeoutMs,
     );
   }
 
